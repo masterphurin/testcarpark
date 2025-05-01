@@ -31,5 +31,5 @@ void loop() {
   //   Serial.print(i);
   //   Serial.println(" at 180 degrees");
   // }
-  delay(1000);  // หน่วงเวลา 1 วินาที
+  // delay(1000);  // หน่วงเวลา 1 วินาที
 }
