@@ -1,36 +1,47 @@
-#include <Wire.h>
-#include <Adafruit_PWMServoDriver.h>
+#include <Arduino.h>
 
-Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
+// Pin Mapping
+const int S0 = 16;
+const int S1 = 17;
+const int S2 = 18;
+const int S3 = 19;
+const int SIG_PIN = 34; // Analog input pin
 
-#define SERVO_MIN 150  // ค่าพัลส์ที่ 0 องศา
-#define SERVO_MAX 600  // ค่าพัลส์ที่ 180 องศา
+void selectChannel(uint8_t channel)
+{
+  digitalWrite(S0, channel & 0x01);
+  digitalWrite(S1, (channel >> 1) & 0x01);
+  digitalWrite(S2, (channel >> 2) & 0x01);
+  digitalWrite(S3, (channel >> 3) & 0x01);
+}
 
-void setup() {
+void setup()
+{
   Serial.begin(115200);
 
-  pwm.begin();  // เริ่มการทำงานกับ PCA9685
-  pwm.setPWMFreq(50);  // กำหนดความถี่ PWM สำหรับ Servo (50Hz คือความถี่ทั่วไปของ Servo)
-  delay(10);
+  // Set up selector pins
+  pinMode(S0, OUTPUT);
+  pinMode(S1, OUTPUT);
+  pinMode(S2, OUTPUT);
+  pinMode(S3, OUTPUT);
+
+  // If SIG_PIN is digital, use pinMode too
+  // pinMode(SIG_PIN, INPUT); // สำหรับ digital sensor
 }
 
-void loop() {
-  // หมุน Servo 5 ตัวไปที่ 0 องศา
-  for (int i = 0; i < 5; i++) {
-    pwm.setPWM(i, 0, SERVO_MIN);  // หมุนที่ 0 องศา
-    Serial.print("Servo ");
+void loop()
+{
+  for (uint8_t i = 0; i < 4; i++)
+  {
+    selectChannel(i);
+    delay(5); // Wait for switching to settle
+
+    int sensorValue = analogRead(SIG_PIN); // เปลี่ยนเป็น digitalRead() หากเป็น digital sensor
+    Serial.print("Channel ");
     Serial.print(i);
-    Serial.println(" at 0 degrees");
+    Serial.print(": ");
+    Serial.println(sensorValue);
   }
-  delay(1000);  // หน่วงเวลา 1 วินาที
 
-  // หมุน Servo 5 ตัวไปที่ 180 องศา
-  // for (int i = 0; i < 5; i++) {
-  //   pwm.setPWM(i, 0, SERVO_MAX);  // หมุนที่ 180 องศา
-  //   Serial.print("Servo ");
-  //   Serial.print(i);
-  //   Serial.println(" at 180 degrees");
-  // }
-  // delay(1000);  // หน่วงเวลา 1 วินาที
+  delay(1000);
 }
-
