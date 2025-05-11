@@ -9,7 +9,7 @@ const char* ssid = "THTPBN_2.4G";
 const char* password = "41084108";
 
 // URL ของเซิร์ฟเวอร์
-const char* url = "http://192.168.1.144/getData.php";
+const char* url = "http://192.168.1.140/getData.php";
 
 int fetchDataOnce(); // ประกาศฟังก์ชัน
 

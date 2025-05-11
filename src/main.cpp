@@ -14,7 +14,7 @@ const char *ssid = "THTPBN_2.4G";
 const char *password = "41084108";
 
 // URL ของเซิร์ฟเวอร์
-const char *url = "http://192.168.1.144/getData.php";
+const char *url = "http://192.168.1.140/getData.php";
 
 int fetchDataOnce(); // ประกาศฟังก์ชัน
 
@@ -80,50 +80,46 @@ void setup()
 
 void loop()
 {
-	// for (uint8_t i = 0; i < 4; i++)
-	// {
-	// 	selectChannel(i);
-	// 	delay(5); // Wait for switching to settle
-
-	// 	int sensorValue = analogRead(SIG_PIN); // เปลี่ยนเป็น digitalRead() หากเป็น digital sensor
-	// 	Serial.print("Channel ");
-	// 	Serial.print(i);
-	// 	Serial.print(": ");
-	// 	Serial.println(sensorValue);
-
-	// 	// PCA9685 PWM control
-	// 	if (sensorValue < 1000)
-	// 	{
-	// 		int pulseWidth = SERVOMIN + (SERVOMAX - SERVOMIN) / 2; // Calculate pulse width for 90 degrees
-	// 		pwm.setPWM(i, 0, pulseWidth);						   // Set the servo to 90 degrees
-	// 	}
-	// 	else if (sensorValue > 3000)
-	// 	{
-	// 		pwm.setPWM(i, 0, SERVOMIN); // Set the servo to 0 degrees
-	// 	}
-	// }
-
 	HTTPClient http;
 
-	int value = fetchDataOnce(); // เรียกใช้ฟังก์ชันดึงค่า
+	int value = fetchDataOnce(); // ดึงค่าช่องจากเซิร์ฟเวอร์
 
-	selectChannel(value); // เลือกช่องที่ได้จากฟังก์ชัน
-	delay(5);			  // Wait for switching to settle
+	if (value < 0 || value > 15) {
+		Serial.println("Invalid slot_number received.");
+		delay(1000);
+		return;
+	}
 
-	int sensorValue = analogRead(SIG_PIN); // เปลี่ยนเป็น digitalRead() หากเป็น digital sensor
-	Serial.print("Channel ");
-	Serial.print(value);
-	Serial.print(": ");
+	Serial.print("Selected Channel: ");
+	Serial.println(value);
+
+	selectChannel(value); // เลือกช่องของมัลติเพล็กเซอร์
+	delay(5);			  // รอให้มั่นใจว่าสวิตช์ทำงานแล้ว
+
+	int sensorValue = analogRead(SIG_PIN); // อ่านค่าจากเซ็นเซอร์
+	Serial.print("Sensor value: ");
 	Serial.println(sensorValue);
 
-	// PCA9685 PWM control
-	int pulseWidth = SERVOMIN + (SERVOMAX - SERVOMIN) / 2; // Calculate pulse width for 90 degrees
+	// คำนวณค่า pulseWidth สำหรับ 90 องศา
+	int pulseWidth = SERVOMIN + (SERVOMAX - SERVOMIN) / 2;
+
+	// ถ้าเป็นช่อง 4-9 ให้กลับทิศทางการหมุน
+	if (value >= 4 && value <= 9) {
+		pulseWidth = SERVOMAX - (pulseWidth - SERVOMIN);
+	}
+
+	// แสดงค่าพัลส์ที่ตั้งค่าไป
+	Serial.print("Pulse Width: ");
+	Serial.println(pulseWidth);
+
+	// สั่งให้เซอร์โวหมุนไปตำแหน่งที่ต้องการ
 	pwm.setPWM(value, 0, pulseWidth);		
-	
-	String urls = String("http://192.168.1.144/setData.php?slot_number=") + String(value);
+
+	// ส่งค่ากลับไปยังเซิร์ฟเวอร์ (HTTP GET)
+	String urls = String("http://192.168.1.140/setData.php?slot_number=") + String(value);
 	Serial.println("URL: " + urls);
 	http.begin(urls);
-	int httpCode = http.GET(); // หรือสามารถใช้ POST ถ้าต้องการ
+	int httpCode = http.GET(); // ส่ง HTTP GET
 	if (httpCode > 0)
 	{
 		String payload = http.getString();
@@ -135,15 +131,27 @@ void loop()
 		Serial.println("Error on HTTP request");
 	}
 	http.end();
-	// Set the servo to 90 degrees
-
-	// delay(1000); // Delay for 1 second before the next loop iteration
 
 	delay(500);
 
-	pwm.setPWM(value, 0, SERVOMIN); // Set the servo to 0 degrees
-	delay(1000); // Delay for 1 second before the next loop iteration
+	// ตอนนี้กลับเซอร์โวไปที่ตำแหน่งเริ่มต้น:
+	// ถ้าช่อง 4-9 จะหมุนไปที่ 180 องศา (SERVOMAX), ถ้าช่อง 0-3 จะหมุนไปที่ 0 องศา (SERVOMIN)
+	int resetPulse = SERVOMIN;
+	// ถ้าเป็นช่อง 4-9 ให้หมุนไปทางกวาดขึ้นด้านขวา
+	if (value >= 4 && value <= 9) {
+		resetPulse = SERVOMAX; // หมุนขึ้นด้านขวา
+	} else {
+		resetPulse = SERVOMIN; // หมุนลงไปที่เดิม
+	}
+	pwm.setPWM(value, 0, resetPulse); // สั่งให้เซอร์โวหมุนไปตำแหน่งรีเซ็ต
+
+	// แสดงค่าพัลส์ที่ใช้ในการรีเซ็ต
+	Serial.print("Reset Pulse Width: ");
+	Serial.println(resetPulse);
+
+	delay(1000); // รอก่อนเริ่มรอบถัดไป
 }
+
 
 int fetchDataOnce()
 {
@@ -168,7 +176,7 @@ int fetchDataOnce()
 				// serializeJsonPretty(jsonDoc, Serial);
 
 				// สมมติว่าเราต้องการดึงค่าจาก key "value"
-				if (jsonDoc.containsKey("slot_number"))
+				if (jsonDoc["slot_number"].is<int>())
 				{
 					int value = jsonDoc["slot_number"];
 					http.end();
